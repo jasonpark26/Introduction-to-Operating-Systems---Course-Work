@@ -3,52 +3,6 @@
  * This code copyright 2021: Roshan Lasredo, Mike Zastre
  *
  * Assignment 3
- * --------------------
- * 	Simulate a Multi-Level Feedback Queue with `3` Levels/Queues each 
- * 	implementing a Round-Robin scheduling policy with a Time Quantum
- * 	of `2`, `4` and `8` resp.
- * 
- * Input: Command Line args
- * ------------------------
- * 	./mlfq <input_test_case_file>
- * 	e.g.
- * 	     ./mlfq test1.txt
- * 
- * Input: Test Case file
- * ---------------------
- * 	Each line corresponds to an instruction and is formatted as:
- *
- * 	<event_tick>,<task_id>,<burst_time>
- * 
- * 	NOTE: 
- * 	1) All times are represented as `whole numbers`.
- * 	2) Special Case:
- * 	     burst_time =  0 -- Task Creation
- * 	     burst_time = -1 -- Task Termination
- * 
- * 
- * Assumptions: (For Multi-Level Feedback Queue)
- * -----------------------
- * 	1) On arrival of a Task with the same priority as the current 
- * 		Task, the current Task is not preempted.
- * 	2) A Task on being preempted is added to the end of its queue.
- * 	3) Arrival tick, Burst tick and termination tick for the same  
- * 		Task will never overlap. But the arrival/exit of one  
- * 		Task may overlap with another Task.
- * 	4) Tasks will be labelled from 1 to 10.
- * 	5) The event_ticks in the test files will be in sorted order.
- * 	6) Once a Task is assigned a queue, it will always continue to 
- * 		run in that queue for any new future bursts (Unless further 
- * 		demoted).
- * 	7) Task termination instruction will always come after the 
- * 		Task completion for the given test case.
- * 	8) Task arrival/termination does not consume CPU cycles.
- * 	9) A task in enqueued into one of the queues only if it requires
- * 		CPU bursts.
- * 	
- * Output:
- * -----------------------
- * 	NOTE: Do not modify the formatting of the print statements.
  * 
  */
 
@@ -60,15 +14,10 @@
 #include <string.h>
 #include <stdbool.h>
 
-/*
- * A queue structure provided to you by the teaching team. This header
- * file contains the function prototypes; the queue routines are
- * linked in from a separate .o file (which is done for you via
- * the `makefile`).
- */
+
 #include "queue.h"
 
-
+///
 /* 
  * Some constants related to assignment description.
  */
@@ -77,12 +26,6 @@
 const int QUEUE_TIME_QUANTUMS[] = { 2, 4, 8 };
 
 
-/*
- * Here are variables that are available to methods. Given these are 
- * global, you need not pass them as parameters to functions. 
- * However, you must be careful while initializing/setting these
- * global variables.
- */
 Queue_t *queue_1;
 Queue_t *queue_2;
 Queue_t *queue_3;
@@ -90,15 +33,6 @@ Task_t task_table[MAX_TASKS];
 Task_t *current_task;
 int remaining_quantum = 0;		// Remaining Time Quantum for the current task
 
-
-/*
- * Function: validate_args
- * -----------------------
- *  Validate the input command line args.
- *
- *  argc: Number of command line arguments provided
- *  argv: Command line arguments
- */
 void validate_args(int argc, char *argv[]) {
 	if(argc != 2) {
 		fprintf(stderr, "Invalid number of input args provided! Expected 1, received %d\n", argc - 1);
@@ -106,28 +40,12 @@ void validate_args(int argc, char *argv[]) {
 	}
 }
 
-
-/*
- * Function: initialize_vars
- * -------------------------
- *  Initialize the three queues.
- */
 void initialize_vars() {
 	queue_1 = init_queue();
 	queue_2 = init_queue();
 	queue_3 = init_queue();
 }
 
-/*
- * Function: read_instruction
- * --------------------------
- *  Reads a single line from the input file and stores the 
- *  appropriate values in the instruction pointer provided. In case
- *  `EOF` is encountered, the `is_eof` flag is set.
- *
- *  fp: File pointer to the input test file
- *  instruction: Pointer to store the read instruction details
- */
 void read_instruction(FILE *fp, Instruction_t *instruction) {
 	char line[MAX_INPUT_LINE];
 	
@@ -152,16 +70,6 @@ void read_instruction(FILE *fp, Instruction_t *instruction) {
 	}
 }
 
-
-
-
-/*
- * Function: get_queue_by_id
- * -------------------------
- *  Returns the Queue associated with the given `queue_id`.
- *
- *  queue_id: Integer Queue identifier.
- */
 Queue_t *get_queue_by_id(int queue_id) {
 	switch (queue_id) {
 		case 1:
@@ -176,135 +84,157 @@ Queue_t *get_queue_by_id(int queue_id) {
 	return NULL;
 }
 
-
-
-/*
- * Function: handle_instruction
- * ----------------------------
- *  Processes the input instruction, depending on the instruction
- *  type:
- *      a. New Task (burst_time == 0)
- *      b. Task Completion (burst_time == -1)
- *      c. Task Burst (burst_time == <int>)
- *
- *  NOTE: 
- *	a. This method performs NO task scheduling, NO Preemption and NO
- *  	Updation of Task priorities/levels. These tasks would be   
- *		handled by the `scheduler`.
- *	b. A task once demoted to a level, retains that level for all 
- *		future bursts unless it is further demoted.
- *
- *  instruction: Input instruction
- *  tick: Clock tick (ONLY For Print statements)
- */
 void handle_instruction(Instruction_t *instruction, int tick) {
 	int task_id = instruction->task_id;
 
-	
 	if(instruction->burst_time == 0) { 
 		// New Task Arrival
-		// TODO ... Insert your Code Here
+		// From read_instruction we are given
+		// &instruction->event_tick, 
+		// &instruction->task_id, 
+		// &instruction->burst_time
+		// Using these variable we put them into task_table with their given id
+
+		//Given a burst time a 0, create a Task and add it to task_table for storage as it won't be enqueued
+		//but data still needs to be stored
+
+		Task_t *task_buffer;
+
+   		task_buffer = malloc(sizeof(Task_t));
+    	task_buffer->next = NULL;
+
+		//Default queue of a created Task would be 
+		task_buffer->id = instruction->task_id;
+		task_buffer->burst_time = instruction->burst_time;
+		task_buffer->remaining_burst_time = instruction->burst_time;
+		task_buffer->current_queue = 1;
+
+		task_buffer->total_execution_time = 0;
+		task_buffer->total_wait_time = 0;
+
+		task_table[task_id-1] = *task_buffer;
 		
-
-
-
 		printf("[%05d] id=%04d NEW\n", tick, task_id);
-	
+
+
 	} else if(instruction->burst_time == -1) { 
-		// Task Termination
 		int waiting_time;
 		int turn_around_time;
 
-		// TODO ... Insert your Code Here
+		//As task is terminating, set the task in task_table to null after printing necessary times
+		Task_t *task_null;
 
+   		task_null = malloc(sizeof(Task_t));
+    	task_null->next = NULL;
 
-
-
-
+		//Set waiting_time and turn_around_time from the task_table thats been updated from update_task_metrics and execute_task
+		waiting_time = task_table[task_id-1].total_wait_time;
+		turn_around_time = task_table[task_id-1].total_execution_time;
 		
 		printf("[%05d] id=%04d EXIT wt=%d tat=%d\n", tick, task_id, 
 			waiting_time, turn_around_time);
 
+		//Setting task to null after print to terminate
+		task_table[task_id-1] = *task_null;
+
 	} else {
-		// CPU Burst for the task
-		// TODO ... Insert your Code Here
+		// in else, burst_time must be greater than 0, using task_id, we update the burst_time and remaining_time
+		// and add it to the queue of task_table[task_id-1].current_queue, the queue will not always be placed in
+		// queue 1 if burst_time finished in queue 2, it will start from there
 
-
-
-
-
+		task_table[task_id-1].burst_time = instruction->burst_time;
+		task_table[task_id-1].remaining_burst_time = instruction->burst_time;
+		enqueue(get_queue_by_id(task_table[task_id-1].current_queue), &(task_table[task_id-1]));
 	}
 }
 
-
-
-/*
- * Function: peek_priority_task
- * ----------------------------
- *  Returns a reference to the Task with the highest priority.
- *  Does NOT dequeue the task.
- */
 Task_t *peek_priority_task() {
-	// TODO ... Insert your Code Here
+	// Checks the queues, if queue 1 is not empty then the first Task in queue 1 has priority, if queue 1 is empty and 
+	// queue 2 is not empty, 
 
-
-
+	//If all queues are empty, then it idles and returns NULL
+	if (is_empty(queue_1) && is_empty(queue_2) && is_empty(queue_3)){
+		return NULL;
+	// Checks if Queue 1 is empty, if not return the task	
+	}else if (is_empty(get_queue_by_id(1)) == 0) {
+		return (get_queue_by_id(1)->start);		
+	// Checks if Queue 1 is empty and Queue 2 is occupied
+	} else if ((is_empty(get_queue_by_id(2)) == 0)) {
+		return (get_queue_by_id(2)->start);
+	// Checks if Queue 1 and Queue 2 are empty and if Queue 3 is occupied
+	} else if ((is_empty(get_queue_by_id(3)) == 0)) {
+		return (get_queue_by_id(3)->start);
+	}
 
 	return NULL;
 }
 
-
-
-/*
- * Function: decrease_task_level
- * -----------------------------
- *  Updates the task to lower its level(Queue) by 1.
- */
 void decrease_task_level(Task_t *task) {
 	task->current_queue = task->current_queue == 3 ? 3 : task->current_queue + 1;
 }
 
-
-
-/*
- * Function: scheduler
- * -------------------
- *  Schedules the task having the highest priority to be the current 
- *  task. Also, for the currently executing task, decreases the task    
- *	level on completion of the current time quantum.
- *
- *  NOTE:
- *  a. The task to be currently executed is `dequeued` from one of the
- *  	queues.
- *  b. On Pre-emption of a task by another task, the preempted task 
- *  	is `enqueued` to the end of its associated queue.
- */
 void scheduler() {
+
 	Task_t *priority_task = peek_priority_task();
 
-	// TODO ... Insert your Code Here
+	//If the task has run its quantum (2/4/8), decrease its task_level
+	//Then check if the queue is not empty, if not enqueue it to its new (lowered) queue
+	if (current_task != NULL) {	
+		//Check if it's burst has reached 2
+		if ((current_task->burst_time) - (current_task->remaining_burst_time) == 2){
+			decrease_task_level(current_task);
+			if (is_empty(get_queue_by_id(current_task->current_queue)) == 0){
+				enqueue((get_queue_by_id(current_task->current_queue)), current_task);
+				current_task = NULL;
+			}
+		//Check if it's 6 as 2 + 4, so quantum of 4 would have to run at least 6 times
+		} else if ((current_task->burst_time) - (current_task->remaining_burst_time) == 6){
+			decrease_task_level(current_task);
+			if (is_empty(get_queue_by_id(current_task->current_queue)) == 0){
+				enqueue((get_queue_by_id(current_task->current_queue)), current_task);
+				current_task = NULL;
+			}
+		//Checks for -6 mod 8 to ensure its run 8 times in the third queue
+		} else if ((((current_task->burst_time - current_task->remaining_burst_time - 6) % 8) == 0) && (current_task->total_execution_time > 6)) {
+			decrease_task_level(current_task);
+			if (is_empty(get_queue_by_id(current_task->current_queue)) == 0){
+				enqueue((get_queue_by_id(current_task->current_queue)), current_task);
+				current_task = NULL;
+			}
+		} 
+	}
 
+	// Checks if current_task is null and priority_task is occupied
+	if (current_task == NULL && priority_task != NULL){
+		//If true, then priority task dequeues from its current_queue and sets the dequeued task as current_task
+		current_task = dequeue(get_queue_by_id(priority_task->current_queue));
 
+	//Checks if current task is not null
+	} else if (current_task != NULL){
+		// and then checks if priority task is not null
+		if (priority_task != NULL) {
+			// if both tasks are not null, we check priority by looking at the current_queue's of both tasks
+			// if priority_tasks queue is less than current_task, it must take priority over current_task
+			if (priority_task->current_queue < current_task->current_queue){
+				//Enqueues the current task into its current_queue, and then updates current task with priority task 
+				enqueue((get_queue_by_id(current_task->current_queue)), current_task);
+				current_task = dequeue(get_queue_by_id(priority_task->current_queue));
+			}
+		}
+	} else {
 
+		current_task = priority_task;
+	}
 }
 
-
-
-/*
- * Function: execute_task
- * ----------------------
- *  Executes the current task (By updating the associated remaining
- *  times). Sets the current_task to NULL on completion of the
- *	current burst.
- *
- *  tick: Clock tick (ONLY For Print statements)
- */
 void execute_task(int tick) {
 	if(current_task != NULL) {
-		// TODO ... Insert your Code Here
-
-
-
+		// Subtract the remaining burst time by 1
+		current_task->remaining_burst_time -= 1;
+		// Increment the total_execution_time
+		current_task->total_execution_time +=1;
+		// Update the task_table with the current_task and its updated values
+		task_table[(current_task->id) - 1] = *current_task;
 
 
 		printf("[%05d] id=%04d req=%d used=%d queue=%d\n", tick, 
@@ -321,34 +251,48 @@ void execute_task(int tick) {
 	}
 }
 
-
-
-/*
- * Function: update_task_metrics
- * -----------------------------
- * 	Increments the waiting time/execution time for the tasks 
- * 	that are currently scheduled (In the queue). These values would  
- * 	be later used for the computation of the task waiting time and  
- *	turnaround time.
- */
 void update_task_metrics() {
-	// TODO ... Insert your Code Here
 
+	int i;
+	//set up a temporary Task_t for pop/pushing from the queue's
+	Task_t *task_temp;
+   	task_temp = malloc(sizeof(Task_t));
+    task_temp->next = NULL;
 
+	//Check if queue_1 is empty, if not then iterate through the queue and increment, total wait and total execution time
+	if (is_empty(queue_1) == 0){
+		for (i=0; i < queue_size(queue_1); i++){
+			task_temp = dequeue(queue_1);
+			task_temp->total_wait_time +=1;
+			task_temp->total_execution_time += 1;
+			enqueue(queue_1, task_temp);
+		}
+	} 
 
+	//Check if queue_2 is empty, if not then iterate through the queue and increment, total wait and total execution time
+	if (is_empty(queue_2) == 0){
+		for (i=0; i < queue_size(queue_2); i++){
+			task_temp = dequeue(queue_2);
+			task_temp->total_wait_time +=1;
+			task_temp->total_execution_time += 1;
+			enqueue(queue_2, task_temp);
+		}
+	} 
 
+	//Check if queue_3 is empty, if not then iterate through the queue and increment, total wait and total execution time
+	if (is_empty(queue_3) == 0){
+		for (i=0; i < queue_size(queue_3); i++){
+			task_temp = dequeue(queue_3);
+			task_temp->total_wait_time +=1;
+			task_temp->total_execution_time += 1;
+			enqueue(queue_3, task_temp);
+		}
+	}
 
 
 
 }
 
-
-
-/*
- * Function: main
- * --------------
- * argv[1]: Input file/test case.
- */
 int main(int argc, char *argv[]) {
 	int tick = 1;
 	int is_inst_complete = false;
