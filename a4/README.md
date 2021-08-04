@@ -1,6 +1,6 @@
 # A3 CSC360 - Jason Park
 # V#00946007
-## _Part A_
+
 
 # Process of virtmem.c
 
@@ -17,3 +17,5 @@ In resolve_address, when there is a free frame set the counter to 1, and when th
 In the replacement scheme create two variable *lowest* and *stored*, *lowest* holds the counter of the current least frequently referenced frame and *stored* holds the current least frequently referenced frame. Iterate through the table using size_of_memory to find the least frequently referenced frame/counter. In the event of a tie breaker, the second loop finds the frame and LFUcounter with the least frequently used. This loop iterates through the table finding the first occurence of the *lowset* to decide the tie breaker. If it finds the lowest that means the tie breaker has been found and break out of the loop. As the frame of LFU has been found as *stored*, update the table. If the frame has a dirty bit flagged, then swap_out will be incrememented. As frame is found compute and return the effective address.
 
 # Clock
+Modify page_table struct to add *hit*. Check if page is already in a table, if found been found, set the hit to 1.
+Iterate through the table using size_of_memory and find the first occurence of when hit is equal to 0, if so, set clockHit to that frame. Then in another loop check the first occurence of when hit is equal to 1, if so set hit back to 0. As the frame of the clock has been found as stored, update the table. If the frame has a dirty bit flagged, then swap_out will be incrememented . As frame is found compute and return the effective address.
