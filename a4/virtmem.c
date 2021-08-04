@@ -46,7 +46,7 @@ int page_faults = 0;
 int mem_refs    = 0;
 int swap_outs   = 0;
 int swap_ins    = 0;
-
+long fifo_track = 0;
 
 /*
  * Page-table information. You may want to modify this in order to
@@ -58,6 +58,8 @@ struct page_table_entry {
     long page_num;
     int dirty;
     int free;
+    int LFUcounter;
+    int arrival;
 };
 
 
@@ -102,14 +104,19 @@ long resolve_address(long logical, int memwrite)
     frame = -1;
     for ( i = 0; i < size_of_memory; i++ ) {
         if (!page_table[i].free && page_table[i].page_num == page) {
+            /* As page has been found, increment the counter for the frame which holds it */
+            page_table[i].LFUcounter++;
             frame = i;
             break;
         }
     }
-
     /* If frame is not -1, then we can successfully resolve the
      * address and return the result. */
     if (frame != -1) {
+        /* Check if memwrite is True, if so set the dirty bit of the frame to 1 */
+        if (memwrite){
+            page_table[frame].dirty = 1;
+        }
         effective = (frame << size_of_frame) | offset;
         return effective;
     }
@@ -133,10 +140,83 @@ long resolve_address(long logical, int memwrite)
     if (frame != -1) {
         page_table[frame].page_num = page;
         page_table[i].free = FALSE;
+        /* Set the current counter to 1 as it is being added to the frame */
+        page_table[i].LFUcounter = 1;
         swap_ins++;
+        
+        /* Check if memwrite is True, if so set the dirty bit of the frame to 1 */
+        if (memwrite) {
+            page_table[frame].dirty = 1;
+        }
+
         effective = (frame << size_of_frame) | offset;
         return effective;
     } else {
+        /* For any replacement scheme the swap_ins are incremented */
+        swap_ins++;
+
+        if (page_replacement_scheme == REPLACE_FIFO) {
+            int frameFIFO;
+            /* If the algorithm is being run for the first time, it will replace page_table[0] as it's first in */
+            page_table[fifo_track].page_num = page;
+            /* If the frame has a dirty bit flagged, then swap_out will be incrememented */
+            if (page_table[fifo_track].dirty){
+                swap_outs++;
+            }
+            /* set frameFIFO as fifo_track */
+            frameFIFO = fifo_track;
+            /* Increment fifo_track with modulo so it can loop back to beginning of the table */
+            fifo_track = (fifo_track + 1) % size_of_memory;
+
+            /* As frame is found compute the effective address */
+	        effective = (frameFIFO << size_of_frame) | offset;
+	        return effective;
+
+        } else if (page_replacement_scheme == REPLACE_LFU) {
+            
+            int lowest; /* lowest holds the counter of the current least frequently referenced frame */ 
+            int stored; /* stored holds the current least frequently referenced frame */
+
+            lowest = page_table[0].LFUcounter; 
+            stored = 0;
+
+            /* iterate through the memory to find the least frequently referenced frame/counter */ 
+            for ( i = 1; i < size_of_memory; i++ ) {
+                if (page_table[i].LFUcounter < lowest) {
+                    lowest = page_table[i].LFUcounter;
+                    stored = i;         
+                }       
+            }
+
+            /* tie breaker, the loop above finds the frame and LFUcounter with the least frequently used */ 
+            /* this loop iterates through it again finding the first occurence of the LFU to decide the tie breaker */
+            for ( i = 0; i < stored; i++ ) {
+                if (page_table[i].LFUcounter == lowest) {
+                    lowest = page_table[i].LFUcounter;
+                    page_table[i].LFUcounter = 1;
+                    stored = i;
+                    
+                    /* if it finds the lowest that means the tie breaker has been found and break */ 
+                    break;
+                }       
+            }
+
+            /* as the frame of LFU has been found as stored, update the table */
+            page_table[stored].page_num = page;
+            /* If the frame has a dirty bit flagged, then swap_out will be incrememented */
+            if (page_table[stored].dirty){
+                swap_outs++;
+            }
+            
+            /* As frame is found compute and return the effective address */
+	        effective = (stored << size_of_frame) | offset;
+	        return effective;
+
+        } else if (page_replacement_scheme == REPLACE_CLOCK) {
+            //run CLOCK algorithm
+        } else if (page_replacement_scheme == REPLACE_OPTIMAL) {
+            //run OPTIMAL algorithm
+        } 
         return -1;
     }
 }
@@ -319,7 +399,9 @@ int main(int argc, char **argv)
             display_progress(ftell(infile) * 100 / infile_size);
         }
     }
-    
+    if (page_replacement_scheme == REPLACE_NONE){
+
+    }
 
     teardown();
     output_report();
