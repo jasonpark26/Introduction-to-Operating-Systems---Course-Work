@@ -1,8 +1,12 @@
 /*
- * Skeleton code for CSC 360, Summer 2021,  Assignment #4
+ * UVic CSC 360, Summer 2021
  *
- * Prepared by: Michael Zastre (University of Victoria) 2021
+ * Jason Park
+ * 
+ * Assignment 3
+ * 
  */
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,7 +63,7 @@ struct page_table_entry {
     int dirty;
     int free;
     int LFUcounter;
-    int arrival;
+    int hit;
 };
 
 
@@ -105,7 +109,6 @@ long resolve_address(long logical, int memwrite)
     for ( i = 0; i < size_of_memory; i++ ) {
         if (!page_table[i].free && page_table[i].page_num == page) {
             /* As page has been found, increment the counter for the frame which holds it */
-            page_table[i].LFUcounter++;
             frame = i;
             break;
         }
@@ -113,6 +116,10 @@ long resolve_address(long logical, int memwrite)
     /* If frame is not -1, then we can successfully resolve the
      * address and return the result. */
     if (frame != -1) {
+        /* As page has been found, increment the counter for the frame which holds it */
+        page_table[frame].LFUcounter++;
+        /* As page has been found, set the hit to 1 */
+        page_table[frame].hit = 1;
         /* Check if memwrite is True, if so set the dirty bit of the frame to 1 */
         if (memwrite){
             page_table[frame].dirty = 1;
@@ -142,6 +149,7 @@ long resolve_address(long logical, int memwrite)
         page_table[i].free = FALSE;
         /* Set the current counter to 1 as it is being added to the frame */
         page_table[i].LFUcounter = 1;
+        page_table[i].hit = 0;
         swap_ins++;
         
         /* Check if memwrite is True, if so set the dirty bit of the frame to 1 */
@@ -213,7 +221,37 @@ long resolve_address(long logical, int memwrite)
 	        return effective;
 
         } else if (page_replacement_scheme == REPLACE_CLOCK) {
-            //run CLOCK algorithm
+            
+            int clockHit;
+            clockHit = 0;
+
+            /* finds the first occurence of when hit is equal to 0, if so set clockHit to the that frame*/
+            for ( i = 0; i < size_of_memory; i++ ) {
+                if (page_table[i].hit == 0) {
+                    clockHit = i;
+                    break;    
+                }       
+            }
+
+            /* checks the first occurence of when hit is equal to 1, if so set hit back to 0*/
+            for ( i = 0; i < size_of_memory; i++ ) {
+                if (page_table[i].hit == 1) {
+                    page_table[i].hit = 0;
+                    break;    
+                }       
+            }
+            /* as the frame of clock hit has been found as stored, update the table */
+            page_table[clockHit].page_num = page;
+            /* If the frame has a dirty bit flagged, then swap_out will be incrememented */
+            if (page_table[clockHit].dirty){
+                swap_outs++;
+            }
+            
+            /* As frame is found compute and return the effective address */
+	        effective = (clockHit << size_of_frame) | offset;
+	        return effective;
+
+
         } else if (page_replacement_scheme == REPLACE_OPTIMAL) {
             //run OPTIMAL algorithm
         } 
